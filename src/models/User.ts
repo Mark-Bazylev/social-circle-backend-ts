@@ -25,6 +25,7 @@ const UserSchema = new Schema<UserDocument>({
   password: {
     type: String,
     required: [true, "Please provide password"],
+    minlength: [4, "Password must be at least 4 characters long"],
   },
 });
 UserSchema.methods.createJWT = function () {
