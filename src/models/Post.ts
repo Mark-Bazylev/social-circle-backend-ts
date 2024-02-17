@@ -5,6 +5,7 @@ export interface PostDetails {
   createdBy: ObjectId;
   content: string;
   likes: ObjectId[];
+  commentsLength: number;
 }
 interface PostDocument extends PostDetails, Document<ObjectId> {
   // Post schema methods
@@ -24,6 +25,11 @@ const PostSchema = new mongoose.Schema<PostDocument>(
     likes: {
       type: [mongoose.Types.ObjectId],
       default: [],
+    },
+
+    commentsLength: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true },

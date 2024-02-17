@@ -38,6 +38,9 @@ export async function getAccount(
     next(e);
   }
 }
+/*TODO this has alot of issues.
+  the files dont delete themselves
+  when passed empty body everything crashes*/
 
 export async function editAccount(
   req: AuthenticatedAccountRequest,

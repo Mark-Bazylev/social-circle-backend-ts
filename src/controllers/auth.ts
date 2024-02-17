@@ -7,6 +7,7 @@ import Account, { AccountDetails } from "../models/Account";
 import FriendData from "../models/FriendData";
 import Post from "../models/Post";
 import { AuthenticatedRequest } from "../middleware/authentication";
+import { deleteImageFile } from "../utils/deleteImageFile";
 
 interface UserRequest extends Request {
   body: UserDetails & AccountDetails;
@@ -36,14 +37,17 @@ export async function createAccount(
       email,
       password: hashedPassword,
     });
-
+    console.log({
+      coverImageName: (req.files as any)["coverImage"][0].originalname,
+      avatarImageName: (req.files as any)["avatarImage"][0].originalname,
+    });
     await Promise.all([
       Account.create({
         createdBy: user.id,
         firstName,
         lastName,
-        coverImageName: (req.files as any)["coverImage"].originalname,
-        avatarImageName: (req.files as any)["avatarImage"].originalname,
+        coverImageName: (req.files as any)["coverImage"][0].originalname,
+        avatarImageName: (req.files as any)["avatarImage"][0].originalname,
       }),
       FriendData.create({ createdBy: user.id }),
     ]);
@@ -66,15 +70,16 @@ export async function signIn(
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (user) {
-      const isPasswordCorrect = await user.comparePassword(password);
-      if (!isPasswordCorrect) {
-        throw new UnauthenticatedError("Invalid Credentials");
-      }
-      const token = user.createJWT();
-
-      res.status(StatusCodes.OK).json({ user, token });
+    if (!user) {
+      throw new BadRequestError("user not found");
     }
+    const isPasswordCorrect = await user.comparePassword(password);
+    if (!isPasswordCorrect) {
+      throw new UnauthenticatedError("Invalid Credentials");
+    }
+    const token = user.createJWT();
+
+    res.status(StatusCodes.OK).json({ user, token });
   } catch (e) {
     next(e);
   }
@@ -99,7 +104,7 @@ export async function changeEmail(
       throw new BadRequestError("Email Already Exists");
     }
     const currentUser = await User.findById(user?._id);
-
+    console.log(currentUser);
     if (!currentUser) {
       throw new UnauthenticatedError("Invalid Credentials");
     }
@@ -107,7 +112,7 @@ export async function changeEmail(
     currentUser.email = newEmail;
     currentUser.save();
 
-    res.status(StatusCodes.OK).json(user);
+    res.status(StatusCodes.OK).json(currentUser);
   } catch (e) {
     next(e);
   }
@@ -147,7 +152,7 @@ export async function changePassword(
       currentUser.password = hashedPassword;
       currentUser.save();
     }
-    res.status(StatusCodes.OK).json(user);
+    res.status(StatusCodes.OK).json(currentUser);
   } catch (e) {
     next(e);
   }
@@ -163,9 +168,13 @@ export async function deleteUser(
     if (!user) {
       throw new UnauthenticatedError("User not found");
     }
+    const account = await Account.findOneAndDelete({ createdBy: user._id });
+    if (account) {
+      deleteImageFile(account.coverImageName);
+      deleteImageFile(account.avatarImageName);
+    }
     await Promise.all([
       User.findByIdAndDelete(user._id),
-      Account.findOneAndDelete({ createdBy: user._id }),
       FriendData.findOneAndDelete({ createdBy: user._id }),
       Post.deleteMany({ createdBy: user._id }),
       Post.updateMany({ likes: user._id }, { $pull: { likes: user._id } }),
